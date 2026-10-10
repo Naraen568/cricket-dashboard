@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricket Stats Dashboard</title>
+    <!-- Include Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Include Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">🏏 Cricket Database Dashboard</h1>
+            <p class="text-gray-600 mt-1">Select a table to view records and search data</p>
+        </header>
+
+        <!-- Table Selector Buttons -->
+        <div class="flex flex-wrap justify-center gap-2 mb-6">
+            <button onclick="changeTable('player')" class="table-btn px-4 py-2 bg-blue-600 text-white rounded-lg shadow text-sm font-medium hover:bg-blue-700 transition">Player</button>
+            <button onclick="changeTable('playerrecord')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">Player Record</button>
+            <button onclick="changeTable('odi_batting_stats')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">ODI Batting</button>
+            <button onclick="changeTable('odi_bowling_stats')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">ODI Bowling</button>
+            <button onclick="changeTable('t20_batting_stats')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">T20 Batting</button>
+            <button onclick="changeTable('t20_bowling_stats')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">T20 Bowling</button>
+            <button onclick="changeTable('matchrecord')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">Match Record</button>
+            <button onclick="changeTable('team')" class="table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition">Team</button>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="mb-6">
+            <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Search data in current table..." 
+                onkeyup="filterData()"
+                class="w-full px-4 py-3 rounded-lg shadow-sm border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+        </div>
+
+        <!-- Data Table Card -->
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead id="tableHeader" class="bg-gray-50">
+                    <!-- Dynamic Headers will go here -->
+                </thead>
+                <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
+                    <!-- Dynamic Data Rows will go here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Supabase with your credentials
+        const SUPABASE_URL = 'https://fuyevjymalcramxybgyv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1eWV2anltYWxjcmFteHliZ3l2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5ODE3MzUsImV4cCI6MjEwNTU1NzczNX0.yGIbu1vdWsDyCmFo16VpowQYpvkSn3uVCE-sohP4pzU';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentTable = 'player';
+        let tableData = [];
+
+        // Switch active table and fetch data
+        async function changeTable(tableName) {
+            currentTable = tableName;
+            
+            // Update button styles to show active state
+            document.querySelectorAll('.table-btn').forEach(btn => {
+                if(btn.textContent.toLowerCase().includes(tableName.replace('_', ' '))) {
+                    btn.className = "table-btn px-4 py-2 bg-blue-600 text-white rounded-lg shadow text-sm font-medium hover:bg-blue-700 transition";
+                } else {
+                    btn.className = "table-btn px-4 py-2 bg-gray-200 text-gray-800 rounded-lg shadow text-sm font-medium hover:bg-gray-300 transition";
+                }
+            });
+
+            document.getElementById('searchInput').value = '';
+            await fetchData();
+        }
+
+        // Fetch Data from Supabase
+        async function fetchData() {
+            const { data, error } = await _supabase
+                .from(currentTable)
+                .select('*');
+
+            if (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="100" class="px-6 py-4 text-center text-red-500">Error loading table data. Check console.</td></tr>`;
+                return;
+            }
+
+            tableData = data || [];
+            renderTable(tableData);
+        }
+
+        // Dynamically build headers and rows based on table columns
+        function renderTable(data) {
+            const headerRow = document.getElementById('tableHeader');
+            const tbody = document.getElementById('tableBody');
+            
+            headerRow.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                headerRow.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Info</th></tr>`;
+                tbody.innerHTML = `<tr><td class="px-6 py-4 text-center text-gray-500">No records found in this table</td></tr>`;
+                return;
+            }
+
+            // Extract column names automatically from the first row object
+            const columns = Object.keys(data[0]);
+
+            // Create Header HTML
+            let headerHtml = '<tr>';
+            columns.forEach(col => {
+                headerHtml += `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${col.replaceAll('_', ' ')}</th>`;
+            });
+            headerHtml += '</tr>';
+            headerRow.innerHTML = headerHtml;
+
+            // Create Rows HTML
+            data.forEach(row => {
+                let rowHtml = '<tr class="hover:bg-gray-50">';
+                columns.forEach(col => {
+                    let val = row[col] !== null && row[col] !== undefined ? row[col] : '-';
+                    rowHtml += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${val}</td>`;
+                });
+                rowHtml += '</tr>';
+                tbody.innerHTML += rowHtml;
+            });
+        }
+
+        // Real-time Search Function across all columns of the active table
+        function filterData() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = tableData.filter(row => {
+                return Object.values(row).some(val => 
+                    String(val).toLowerCase().includes(query)
+                );
+            });
+            renderTable(filtered);
+        }
+
+        // Initial load
+        fetchData();
+    </script>
+</body>
+</html>
